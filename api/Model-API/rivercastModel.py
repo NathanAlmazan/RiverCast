@@ -11,11 +11,40 @@ from sklearn.preprocessing import MinMaxScaler
 from skimage.measure import block_reduce
 from sklearn.metrics import mean_absolute_error
 
+import requests
+from metpy.calc import specific_humidity_from_dewpoint
+from metpy.units import units
+
+import mysql.connector
+from datetime import datetime, timedelta
+from sqlalchemy import create_engine
+
+mydb = mysql.connector.connect(
+host="database-1.cccp1zhjxtzi.ap-southeast-1.rds.amazonaws.com",
+user="admin",
+password="Nath1234",
+database= "rivercast"
+)
+
+
 #IMPORTING
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')  # configure GPU utilization
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')  # configure GPU    utilization
 device
 
-df = pd.read_csv('riverlevel.csv')  # import dataset
+
+query = "SELECT * FROM rivercast.modelData1;"
+result_dataFrame = pd.read_sql(query, mydb)
+
+# Specify the column to exclude (change 'column_to_exclude' to the actual column name)
+column_to_exclude = 'Datetime'
+
+# Exclude the specified column
+df = result_dataFrame.drop(column_to_exclude, axis=1, errors='ignore')
+
+# Print the DataFrame without the excluded column
+print(df.head())
+
+# Now 'df' can be used as 'mainDataToDB' or for further processing
 
 # convert month name to integer
 month_dict = dict((v, k) for k, v in enumerate(calendar.month_name))
@@ -372,331 +401,253 @@ def forecast():
     return forecast_df, true_df
 
 
+def updateMainData():
 
+    cursor = mydb.cursor()
 
-def sendCleanData():
-    df = pd.read_csv('riverlevel.csv')  # import dataset
+    cursor.execute("SELECT Datetime FROM rivercast.modelData1 order by Datetime DESC LIMIT 1")
+    lastDTindex = cursor.fetchone()
 
-    # convert month name to integer
-    month_dict = dict((v, k) for k, v in enumerate(calendar.month_name))
-    df['Month'] = df['Month'].map(month_dict)
+    ldi = str(lastDTindex).replace("(datetime.datetime(", "").replace("),)", "").replace(", ", "-")
 
-    # create datetime column
-    df[['Year', 'Month', 'Day', 'Hour']] = df[['Year', 'Month', 'Day', 'Hour']].astype(int)
-    df['Hour'] = df['Hour'].apply(lambda x: x if x < 24 else 0)
+    lastDT = datetime.strptime(ldi, '%Y-%m-%d-%H-%M')
 
-    # convert year, month, day, and hour columns into timestamp
-    df['Datetime'] = df[['Year', 'Month', 'Day', 'Hour']].apply(lambda row: datetime(row['Year'], row['Month'], row['Day'], row['Hour']).isoformat(), axis=1)
-    df["Datetime"] = pd.to_datetime(df["Datetime"], format='ISO8601')
+    cursor = mydb.cursor()
 
-    # assign timestamps as the data frame index
-    df.index = df["Datetime"]
-    df = df.drop(['Datetime'], axis=1)
+    # Common date calculations
+    d = lastDT
 
-    # select the parameters
-    df = df[['Waterlevel', 'Waterlevel.1', 'Waterlevel.2', 'Waterlevel.3', 'RF-Intensity', 'RF-Intensity.1', 'RF-Intensity.2', 'RF-Intensity.3', 'Precipitation', 'Precipitation.1', 'Precipitation.2', 'Humidity', 'Humidity.1', 'Humidity.2', 'Temperature', 'Temperature.1', 'Temperature.2']] 
-    df = df.astype(np.float64)  # convert parameters into a double precision floating number
+    h = d.hour
+    m = d.minute
+    s = d.second
+    ms = d.microsecond
 
-    # fill in missing values using linear interpolation
-    df = df.interpolate(method='linear', limit_direction='forward')
-    df = df.resample('6H').max()  # resample dataset using the max value for each 24-hours
-    df = df.rolling(120).mean().dropna()  # perform moving average smoothing
+    dday = d + timedelta(hours=1)
 
-    df.head(10)  # display data frame
+    datetoday = dday.strftime("%Y-%m-%d:%H")
 
-    rawData = df
+    startDate = datetoday 
 
-    # scale data
-    scaler = MinMaxScaler()
-    scaler.fit(df)
-    # train label scaler
-    label_scaler = MinMaxScaler()
-    label_scaler.fit(df[['Waterlevel', 'Waterlevel.1', 'Waterlevel.2', 'Waterlevel.3']])
+    ed = datetime.today()
 
-    scaled_ds = scaler.transform(df)
-    df = pd.DataFrame(scaled_ds, columns=df.columns, index=df.index)
 
-    #PCA AND EUCLIDEAN KERNEL
+    edate = ed - timedelta(minutes=m, seconds=s, microseconds=ms) + timedelta(hours=1)
 
-    # center data
-    rainfall_df = df[['RF-Intensity', 'RF-Intensity.1', 'RF-Intensity.2', 'RF-Intensity.3']]
 
+    endDate = edate.strftime("%Y-%m-%d:%H")
 
-    # calculate pairwise squared Euclidean distances
-    sq_dists = sc.spatial.distance.pdist(rainfall_df.values.T, 'sqeuclidean')
+    # Weather data
+    weatherbit = f'https://api.weatherbit.io/v2.0/history/hourly?lat=14.679696901082357&lon=121.10970052493437&start_date={startDate}&end_date={endDate}&tz=local&key=2b382660ad4843188647514206bf330e'
+    wbRes = requests.get(weatherbit)
+    wbReq = wbRes.json()
 
-    # convert pairwise distances into a square matrix
-    mat_sq_dists = sc.spatial.distance.squareform(sq_dists)
+    try:
+        wbReq = wbRes.json()
+        wbitArr = []
 
-    # compute the symmetric kernel matrix.
-    gamma = 1 / len(rainfall_df.columns)
-    K = np.exp(-gamma * mat_sq_dists)
+        for current_weather in wbReq['data']:
+            time_date = current_weather['timestamp_local']
+            dpt = current_weather['dewpt']
+            prsr = current_weather['pres']
+            preci = current_weather['precip']
+            temperature = current_weather['temp']
+            humi = specific_humidity_from_dewpoint(prsr * units.hPa, dpt * units.degC).to('g/kg')
+            
+            strHumi = str(humi)
+            humidity = strHumi.replace(" gram / kilogram", "")
+            
+            wbitArr.append({
+                "date_time": time_date,
+                "humidity": humidity,
+                "precipitation": preci,
+                "temperature": temperature
+            })
 
-    # center the kernel matrix.
-    N = K.shape[0]
-    one_n = np.ones((N, N)) / N
-    K = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
+        weather_df = pd.DataFrame(wbitArr)
 
-    # calculate eigenvectors and eigenvalues
-    eigenvalues, eigenvectors = np.linalg.eigh(K)
+        weather_df['temperature1'] = weather_df['temperature'].copy()
+        weather_df['humidity1'] = weather_df['humidity'].copy()
+        weather_df['precipitation1'] = weather_df['precipitation'].copy()
 
-    # calculate components
-    rainfall_df = np.matmul(rainfall_df, eigenvectors) 
-    rainfall_df = rainfall_df.iloc[:, 1]
+        weather_df['temperature2'] = weather_df['temperature'].copy()
+        weather_df['humidity2'] = weather_df['humidity'].copy()
+        weather_df['precipitation2'] = weather_df['precipitation'].copy()
 
-    # center data
-    precipitation_df = df[['Precipitation', 'Precipitation.1', 'Precipitation.2']]
+        weather_df = weather_df.reindex(columns=['humidity', 'precipitation', 'temperature', 'temperature1', 'humidity1', 'precipitation1', 'temperature2', 'humidity2', 'precipitation2', 'date_time'])
 
+    except KeyError:
+        print("Data are up-to-date")
+        weather_df = pd.DataFrame()
 
-    # calculate pairwise squared Euclidean distances
-    sq_dists = sc.spatial.distance.pdist(precipitation_df.values.T, 'sqeuclidean')
+    # Water level data
+    wlArr = []
 
-    # convert pairwise distances into a square matrix
-    mat_sq_dists = sc.spatial.distance.squareform(sq_dists)
+    base_url = 'http://121.58.193.173:8080/water/map_list.do?ymdhm='
+    obsnm_list = ["Nangka", "Sto Nino", "Montalban"]
 
-    # compute the symmetric kernel matrix.
-    gamma = 1/len(precipitation_df.columns)
-    K = np.exp(-gamma * mat_sq_dists)
 
-    # center the kernel matrix.
-    N = K.shape[0]
-    one_n = np.ones((N, N)) / N
-    K = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
+    start_date = datetime(dday.year, dday.month, dday.day, dday.hour)
+    end_date = datetime(edate.year, edate.month, edate.day, edate.hour)
+    current_date = start_date
 
-    # calculate eigenvectors and eigenvalues
-    eigenvalues, eigenvectors = np.linalg.eigh(K)
 
-    # calculate components
-    precipitation_df = np.matmul(precipitation_df, eigenvectors) 
-    precipitation_df = precipitation_df.iloc[:, 1]
+    try:
+        for current_date in pd.date_range(start=start_date, end=end_date, freq='H'):
+            formatted_date = current_date.strftime('%Y%m%d%H%M')
+            url = f"{base_url}{formatted_date}"
 
-    # center data
-    humidity_df = df[['Humidity', 'Humidity.1', 'Humidity.2']]
+            try:
+                response = requests.get(url)
+                data = response.json()
 
+                entry_data = {}
 
-
-    # calculate pairwise squared Euclidean distances
-    sq_dists = sc.spatial.distance.pdist(humidity_df.values.T, 'sqeuclidean')
-
-    # convert pairwise distances into a square matrix
-    mat_sq_dists = sc.spatial.distance.squareform(sq_dists)
-
-    # compute the symmetric kernel matrix.
-    gamma = 1/len(humidity_df.columns)
-    K = np.exp(-gamma * mat_sq_dists)
-
-    # center the kernel matrix.
-    N = K.shape[0]
-    one_n = np.ones((N, N)) / N
-    K = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
-
-    # calculate eigenvectors and eigenvalues
-    eigenvalues, eigenvectors = np.linalg.eigh(K)
-
-    # calculate components
-    humidity_df = np.matmul(humidity_df, eigenvectors) 
-    humidity_df = humidity_df.iloc[:, 1]
-
-    # center data
-    temp_df = df[['Temperature', 'Temperature.1', 'Temperature.2']]
-
-
-
-    # calculate pairwise squared Euclidean distances
-    sq_dists = sc.spatial.distance.pdist(temp_df.values.T, 'sqeuclidean')
-
-    # convert pairwise distances into a square matrix
-    mat_sq_dists = sc.spatial.distance.squareform(sq_dists)
-
-    # compute the symmetric kernel matrix.
-    gamma = 1/len(temp_df.columns)
-    K = np.exp(-gamma * mat_sq_dists)
-
-    # center the kernel matrix.
-    N = K.shape[0]
-    one_n = np.ones((N, N)) / N
-    K = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
-
-    # calculate eigenvectors and eigenvalues
-    eigenvalues, eigenvectors = np.linalg.eigh(K)
-
-    # calculate components
-    temp_df = np.matmul(temp_df, eigenvectors)
-    temp_df = temp_df.iloc[:, 1]
-
-    weather_df = pd.concat([rainfall_df, precipitation_df, humidity_df, temp_df], axis=1)
-    weather_df.columns = ['Rainfall', 'Precipitation', 'Humidity', 'Temperature']
-
-    river_df = df[['Waterlevel', 'Waterlevel.1', 'Waterlevel.2', 'Waterlevel.3']]
-    reduced_df = pd.concat([river_df, weather_df], axis=1)
-
-    print(reduced_df.head(10))
-
-
-    cleanData = reduced_df
-
-    return cleanData
-
-
-def sendrawData():
-    df = pd.read_csv('riverlevel.csv')  # import dataset
-
-    # convert month name to integer
-    month_dict = dict((v, k) for k, v in enumerate(calendar.month_name))
-    df['Month'] = df['Month'].map(month_dict)
-
-    # create datetime column
-    df[['Year', 'Month', 'Day', 'Hour']] = df[['Year', 'Month', 'Day', 'Hour']].astype(int)
-    df['Hour'] = df['Hour'].apply(lambda x: x if x < 24 else 0)
-
-    # convert year, month, day, and hour columns into timestamp
-    df['Datetime'] = df[['Year', 'Month', 'Day', 'Hour']].apply(lambda row: datetime(row['Year'], row['Month'], row['Day'], row['Hour']).isoformat(), axis=1)
-    df["Datetime"] = pd.to_datetime(df["Datetime"], format='ISO8601')
-
-    # assign timestamps as the data frame index
-    df.index = df["Datetime"]
-    df = df.drop(['Datetime'], axis=1)
-
-    # select the parameters
-    df = df[['Waterlevel', 'Waterlevel.1', 'Waterlevel.2', 'Waterlevel.3', 'RF-Intensity', 'RF-Intensity.1', 'RF-Intensity.2', 'RF-Intensity.3', 'Precipitation', 'Precipitation.1', 'Precipitation.2', 'Humidity', 'Humidity.1', 'Humidity.2', 'Temperature', 'Temperature.1', 'Temperature.2']] 
-    df = df.astype(np.float64)  # convert parameters into a double precision floating number
-
-    # fill in missing values using linear interpolation
-    df = df.interpolate(method='linear', limit_direction='forward')
-    df = df.resample('6H').max()  # resample dataset using the max value for each 24-hours
-    df = df.rolling(120).mean().dropna()  # perform moving average smoothing
-
-    df.head(10)  # display data frame
-
-    rawData = df
-
-    # scale data
-    scaler = MinMaxScaler()
-    scaler.fit(df)
-    # train label scaler
-    label_scaler = MinMaxScaler()
-    label_scaler.fit(df[['Waterlevel', 'Waterlevel.1', 'Waterlevel.2', 'Waterlevel.3']])
-
-    scaled_ds = scaler.transform(df)
-    df = pd.DataFrame(scaled_ds, columns=df.columns, index=df.index)
-
-    #PCA AND EUCLIDEAN KERNEL
-
-    # center data
-    rainfall_df = df[['RF-Intensity', 'RF-Intensity.1', 'RF-Intensity.2', 'RF-Intensity.3']]
-
-
-    # calculate pairwise squared Euclidean distances
-    sq_dists = sc.spatial.distance.pdist(rainfall_df.values.T, 'sqeuclidean')
-
-    # convert pairwise distances into a square matrix
-    mat_sq_dists = sc.spatial.distance.squareform(sq_dists)
-
-    # compute the symmetric kernel matrix.
-    gamma = 1 / len(rainfall_df.columns)
-    K = np.exp(-gamma * mat_sq_dists)
-
-    # center the kernel matrix.
-    N = K.shape[0]
-    one_n = np.ones((N, N)) / N
-    K = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
-
-    # calculate eigenvectors and eigenvalues
-    eigenvalues, eigenvectors = np.linalg.eigh(K)
-
-    # calculate components
-    rainfall_df = np.matmul(rainfall_df, eigenvectors) 
-    rainfall_df = rainfall_df.iloc[:, 1]
-
-    # center data
-    precipitation_df = df[['Precipitation', 'Precipitation.1', 'Precipitation.2']]
-
-
-    # calculate pairwise squared Euclidean distances
-    sq_dists = sc.spatial.distance.pdist(precipitation_df.values.T, 'sqeuclidean')
-
-    # convert pairwise distances into a square matrix
-    mat_sq_dists = sc.spatial.distance.squareform(sq_dists)
-
-    # compute the symmetric kernel matrix.
-    gamma = 1/len(precipitation_df.columns)
-    K = np.exp(-gamma * mat_sq_dists)
-
-    # center the kernel matrix.
-    N = K.shape[0]
-    one_n = np.ones((N, N)) / N
-    K = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
-
-    # calculate eigenvectors and eigenvalues
-    eigenvalues, eigenvectors = np.linalg.eigh(K)
-
-    # calculate components
-    precipitation_df = np.matmul(precipitation_df, eigenvectors) 
-    precipitation_df = precipitation_df.iloc[:, 1]
-
-    # center data
-    humidity_df = df[['Humidity', 'Humidity.1', 'Humidity.2']]
-
-
-
-    # calculate pairwise squared Euclidean distances
-    sq_dists = sc.spatial.distance.pdist(humidity_df.values.T, 'sqeuclidean')
-
-    # convert pairwise distances into a square matrix
-    mat_sq_dists = sc.spatial.distance.squareform(sq_dists)
-
-    # compute the symmetric kernel matrix.
-    gamma = 1/len(humidity_df.columns)
-    K = np.exp(-gamma * mat_sq_dists)
-
-    # center the kernel matrix.
-    N = K.shape[0]
-    one_n = np.ones((N, N)) / N
-    K = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
-
-    # calculate eigenvectors and eigenvalues
-    eigenvalues, eigenvectors = np.linalg.eigh(K)
-
-    # calculate components
-    humidity_df = np.matmul(humidity_df, eigenvectors) 
-    humidity_df = humidity_df.iloc[:, 1]
-
-    # center data
-    temp_df = df[['Temperature', 'Temperature.1', 'Temperature.2']]
-
-
-
-    # calculate pairwise squared Euclidean distances
-    sq_dists = sc.spatial.distance.pdist(temp_df.values.T, 'sqeuclidean')
-
-    # convert pairwise distances into a square matrix
-    mat_sq_dists = sc.spatial.distance.squareform(sq_dists)
-
-    # compute the symmetric kernel matrix.
-    gamma = 1/len(temp_df.columns)
-    K = np.exp(-gamma * mat_sq_dists)
-
-    # center the kernel matrix.
-    N = K.shape[0]
-    one_n = np.ones((N, N)) / N
-    K = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
-
-    # calculate eigenvectors and eigenvalues
-    eigenvalues, eigenvectors = np.linalg.eigh(K)
-
-    # calculate components
-    temp_df = np.matmul(temp_df, eigenvectors)
-    temp_df = temp_df.iloc[:, 1]
-
-    weather_df = pd.concat([rainfall_df, precipitation_df, humidity_df, temp_df], axis=1)
-    weather_df.columns = ['Rainfall', 'Precipitation', 'Humidity', 'Temperature']
-
-    river_df = df[['Waterlevel', 'Waterlevel.1', 'Waterlevel.2', 'Waterlevel.3']]
-    reduced_df = pd.concat([river_df, weather_df], axis=1)
-
-    print(reduced_df.head(10))
-
-
-    cleanData = reduced_df
-
-    return rawData
+                for entry in data:
+                    for i, obsnm in enumerate(obsnm_list, start=1):
+                        if obsnm in entry['obsnm']:
+                            year = int(formatted_date[:4])
+                            month = datetime.strptime(formatted_date[4:6], '%m').strftime('%B')
+                            day = int(formatted_date[6:8])
+                            hour = int(formatted_date[8:10])
+                            waterlevel = entry.get('wl', 'null')
+                            
+                            # Remove "(*)" from waterlevel
+                            waterlevel = waterlevel.replace("(*)", "")
+
+                            entry_data.update({
+                                f"station{i}": entry['obsnm'],
+                                f"year{i}": year,
+                                f"month{i}": month,
+                                f"day{i}": day,
+                                f"hour{i}": hour,
+                                f"waterlevel{i}": waterlevel
+                            })
+
+                wlArr.append(entry_data)
+
+            except Exception as e:
+                print(f"No waterlevel fetched for {formatted_date}: {e}")
+
+    except KeyError:
+        print("Water level data are up-to-date")
+        waterlevel_df = pd.DataFrame()
+
+    waterlevel_df = pd.DataFrame(wlArr)
+
+    # Check if 'waterlevel2' column exists before trying to access it
+    if 'waterlevel2' in waterlevel_df.columns:
+        waterlevel_df['waterlevel2dup'] = waterlevel_df['waterlevel2'].copy()
+    else:
+        print("Data are up-to-date")
+
+    waterlevel_df = waterlevel_df.reindex(columns=['station1', 'year1', 'month1', 'day1', 'hour1','waterlevel1', 'station2', 'year2', 'month2', 'day2', 'hour2','waterlevel2', 'waterlevel2dup', 'station3', 'year3', 'month3', 'day3', 'hour3','waterlevel3'])
+
+    waterlevel_df = waterlevel_df.rename(columns={"station1": "station_1","station2": "station_2"})
+
+
+    # Rainfall data
+    wlArr = []
+
+    base_url = 'http://121.58.193.173:8080/rainfall/map_list.do?ymdhm='
+    obsnm_list = ["Nangka", "Mt. Oro"]
+
+    current_date = start_date
+
+    try:
+        for current_date in pd.date_range(start=start_date, end=end_date, freq='H'):
+            formatted_date = current_date.strftime('%Y%m%d%H%M')
+            url = f"{base_url}{formatted_date}"
+
+            try:
+                response = requests.get(url)
+                data = response.json()
+
+                entry_data = {}
+
+                for entry in data:
+                    for i, obsnm in enumerate(obsnm_list, start=1):
+                        if obsnm in entry['obsnm']:
+                            rainfall = entry.get('rf', 'null')
+                            
+                            # Remove "(*)" from rainfall
+                            rainfall = rainfall.replace("(*)", "")
+
+                            entry_data.update({
+                                f"station{i}": entry['obsnm'],
+                                f"rainfall{i}": rainfall
+                            })
+
+                wlArr.append(entry_data)
+
+            except Exception as e:
+                print(f"No rainfall data fetched for {formatted_date}: {e}")
+
+    except KeyError:
+        print("Rainfall data are up-to-date")
+        rainfall_df = pd.DataFrame()
+
+    rainfall_df = pd.DataFrame(wlArr)
+
+    # Check if 'rainfall1' column exists before trying to access it
+    if 'rainfall1' in rainfall_df.columns:
+        rainfall_df['rainfall1dup'] = rainfall_df['rainfall1']
+    else:
+        print("Data are up-to-date")
+    updatedData = ""
+    # Similarly, check for 'rainfall2' column
+    if 'rainfall2' in rainfall_df.columns:
+        rainfall_df['rainfall2dup'] = rainfall_df['rainfall2']
+    else:
+        updatedData = "Data are up-to-date"
+
+    rainfall_df = rainfall_df.reindex(columns=['station1', 'rainfall1', 'rainfall1dup', 'station2', 'rainfall2', 'rainfall2dup'])
+
+
+    # Consolidate all data into one DataFrame
+    merged_df = pd.concat([waterlevel_df, rainfall_df, weather_df ], axis=1).dropna()
+
+    # Assuming your DataFrame is called merged_df
+    new_columns = {
+        'station_1': 'Station',
+        'year1': 'Year',
+        'month1': 'Month',
+        'day1': 'Day',
+        'hour1': 'Hour',
+        'waterlevel1': 'Waterlevel',
+        'station_2': 'Station.1',
+        'year2': 'Year.1',
+        'month2': 'Month.1',
+        'day2': 'Day.1',
+        'hour2': 'Hour.1',
+        'waterlevel2': 'Waterlevel.1',
+        'waterlevel2dup': 'Waterlevel.2',
+        'station3': 'Station.2',
+        'year3': 'Year.2',
+        'month3': 'Month.2',
+        'day3': 'Day.2',
+        'hour3': 'Hour.2',
+        'waterlevel3': 'Waterlevel.3',
+        'station1': 'RF-Station',
+        'rainfall1': 'RF-Intensity',
+        'rainfall1dup': 'RF-Intensity.1',
+        'station2': 'RF-Station.1',
+        'rainfall2': 'RF-Intensity.2',
+        'rainfall2dup': 'RF-Intensity.3',
+        'humidity': 'Humidity',
+        'precipitation': 'Precipitation',
+        'temperature': 'Temperature',
+        'temperature1': 'Temperature.1',
+        'humidity1': 'Humidity.1',
+        'precipitation1': 'Precipitation.1',
+        'temperature2': 'Temperature.2',
+        'humidity2': 'Humidity.2',
+        'precipitation2': 'Precipitation.2',
+        'date_time': 'Datetime'
+    }
+
+    merged_df.rename(columns=new_columns, inplace=True)
+
+    # Save to CSV
+    merged_df.to_csv('consolidated_data.csv', index=False)
+
+    return merged_df, updatedData

@@ -1,58 +1,17 @@
-,station3,year3,month3,day3,hour3,waterlevel3,station1,year1,month1,day1,hour1,waterlevel1,station2,year2,month2,day2,hour2,waterlevel2
-0,Montalban,2023.0,November,15.0,1.0,21.56,,,,,,,,,,,,
-1,,,,,,,Nangka,2023.0,November,15.0,1.0,15.93,,,,,,
-2,,,,,,,,,,,,,Sto Nino,2023.0,November,15.0,1.0,11.76
-3,Montalban,2023.0,November,15.0,2.0,21.56(*),,,,,,,,,,,,
-4,,,,,,,Nangka,2023.0,November,15.0,2.0,15.93(*),,,,,,
-5,,,,,,,,,,,,,Sto Nino,2023.0,November,15.0,2.0,11.71
-6,Montalban,2023.0,November,15.0,3.0,21.56,,,,,,,,,,,,
-7,,,,,,,Nangka,2023.0,November,15.0,3.0,15.93,,,,,,
-8,,,,,,,,,,,,,Sto Nino,2023.0,November,15.0,3.0,11.69(*)
-9,Montalban,2023.0,November,15.0,4.0,21.56,,,,,,,,,,,,
-10,,,,,,,Nangka,2023.0,November,15.0,4.0,15.93,,,,,,
-11,,,,,,,,,,,,,Sto Nino,2023.0,November,15.0,4.0,11.68(*)
-12,Montalban,2023.0,November,15.0,5.0,21.56,,,,,,,,,,,,
-13,,,,,,,Nangka,2023.0,November,15.0,5.0,15.93,,,,,,
-14,,,,,,,,,,,,,Sto Nino,2023.0,November,15.0,5.0,11.67
-15,Montalban,2023.0,November,15.0,6.0,21.56,,,,,,,,,,,,
-16,,,,,,,Nangka,2023.0,November,15.0,6.0,15.93,,,,,,
-17,,,,,,,,,,,,,Sto Nino,2023.0,November,15.0,6.0,11.65
-18,Montalban,2023.0,November,15.0,7.0,21.56,,,,,,,,,,,,
-19,,,,,,,Nangka,2023.0,November,15.0,7.0,15.93,,,,,,
-20,,,,,,,,,,,,,Sto Nino,2023.0,November,15.0,7.0,11.65
-21,Montalban,2023.0,November,15.0,8.0,21.56,,,,,,,,,,,,
-22,,,,,,,Nangka,2023.0,November,15.0,8.0,15.93,,,,,,
-23,,,,,,,,,,,,,Sto Nino,2023.0,November,15.0,8.0,11.64
-24,Montalban,2023.0,November,15.0,9.0,21.56(*),,,,,,,,,,,,
-25,,,,,,,Nangka,2023.0,November,15.0,9.0,15.93(*),,,,,,
-26,,,,,,,,,,,,,Sto Nino,2023.0,November,15.0,9.0,11.65
-27,Montalban,2023.0,November,15.0,10.0,21.56,,,,,,,,,,,,
-28,,,,,,,Nangka,2023.0,November,15.0,10.0,15.93,,,,,,
-29,,,,,,,,,,,,,Sto Nino,2023.0,November,15.0,10.0,11.65
-30,Montalban,2023.0,November,15.0,11.0,21.56,,,,,,,,,,,,
-31,,,,,,,Nangka,2023.0,November,15.0,11.0,15.93,,,,,,
-32,,,,,,,,,,,,,Sto Nino,2023.0,November,15.0,11.0,11.67
-33,Montalban,2023.0,November,15.0,12.0,21.56,,,,,,,,,,,,
-34,,,,,,,Nangka,2023.0,November,15.0,12.0,15.93,,,,,,
-35,,,,,,,,,,,,,Sto Nino,2023.0,November,15.0,12.0,11.65(*)
-36,Montalban,2023.0,November,15.0,13.0,21.56,,,,,,,,,,,,
-37,,,,,,,Nangka,2023.0,November,15.0,13.0,15.93,,,,,,
-38,,,,,,,,,,,,,Sto Nino,2023.0,November,15.0,13.0,11.66
-39,Montalban,2023.0,November,15.0,14.0,21.56,,,,,,,,,,,,
-40,,,,,,,Nangka,2023.0,November,15.0,14.0,15.93,,,,,,
-41,,,,,,,,,,,,,Sto Nino,2023.0,November,15.0,14.0,11.66(*)
-42,Montalban,2023.0,November,15.0,15.0,21.56,,,,,,,,,,,,
-43,,,,,,,Nangka,2023.0,November,15.0,15.0,15.93,,,,,,
-44,,,,,,,,,,,,,Sto Nino,2023.0,November,15.0,15.0,11.66(*)
-45,Montalban,2023.0,November,15.0,16.0,21.56,,,,,,,,,,,,
-46,,,,,,,Nangka,2023.0,November,15.0,16.0,15.93,,,,,,
-47,,,,,,,,,,,,,Sto Nino,2023.0,November,15.0,16.0,11.66(*)
-48,Montalban,2023.0,November,15.0,17.0,21.56,,,,,,,,,,,,
-49,,,,,,,Nangka,2023.0,November,15.0,17.0,15.93,,,,,,
-50,,,,,,,,,,,,,Sto Nino,2023.0,November,15.0,17.0,11.66(*)
-51,Montalban,2023.0,November,15.0,18.0,21.56,,,,,,,,,,,,
-52,,,,,,,Nangka,2023.0,November,15.0,18.0,15.93(*),,,,,,
-53,,,,,,,,,,,,,Sto Nino,2023.0,November,15.0,18.0,11.66(*)
-54,Montalban,2023.0,November,15.0,19.0,21.56,,,,,,,,,,,,
-55,,,,,,,Nangka,2023.0,November,15.0,19.0,15.93,,,,,,
-56,,,,,,,,,,,,,Sto Nino,2023.0,November,15.0,19.0,11.66(*)
+station3,year3,month3,day3,hour3,waterlevel3,station1,year1,month1,day1,hour1,waterlevel1,station2,year2,month2,day2,hour2,waterlevel2
+Montalban,2023,November,16,0,21.56,Nangka,2023,November,16,0,15.93,Sto Nino,2023,November,16,0,11.66
+Montalban,2023,November,16,1,21.56,Nangka,2023,November,16,1,15.93,Sto Nino,2023,November,16,1,11.66
+Montalban,2023,November,16,2,21.56,Nangka,2023,November,16,2,15.93,Sto Nino,2023,November,16,2,11.66
+Montalban,2023,November,16,3,21.56,Nangka,2023,November,16,3,15.93,Sto Nino,2023,November,16,3,11.66
+Montalban,2023,November,16,4,21.56,Nangka,2023,November,16,4,15.93,Sto Nino,2023,November,16,4,11.66
+Montalban,2023,November,16,5,21.56,Nangka,2023,November,16,5,15.93,Sto Nino,2023,November,16,5,11.66
+Montalban,2023,November,16,6,21.56,Nangka,2023,November,16,6,15.93,Sto Nino,2023,November,16,6,11.66
+Montalban,2023,November,16,7,21.56,Nangka,2023,November,16,7,15.93,Sto Nino,2023,November,16,7,11.66
+Montalban,2023,November,16,8,21.56,Nangka,2023,November,16,8,15.93,Sto Nino,2023,November,16,8,11.66
+Montalban,2023,November,16,9,21.56,Nangka,2023,November,16,9,15.93,Sto Nino,2023,November,16,9,11.66
+Montalban,2023,November,16,10,21.56,Nangka,2023,November,16,10,15.93,Sto Nino,2023,November,16,10,11.66
+Montalban,2023,November,16,11,21.56,Nangka,2023,November,16,11,15.93,Sto Nino,2023,November,16,11,11.66
+Montalban,2023,November,16,12,21.56,Nangka,2023,November,16,12,15.93,Sto Nino,2023,November,16,12,11.66
+Montalban,2023,November,16,13,21.56,Nangka,2023,November,16,13,15.93,Sto Nino,2023,November,16,13,11.66
+Montalban,2023,November,16,14,21.56,Nangka,2023,November,16,14,15.93,Sto Nino,2023,November,16,14,11.66
+Montalban,2023,November,16,15,21.56,Nangka,2023,November,16,15,15.93,Sto Nino,2023,November,16,15,11.66

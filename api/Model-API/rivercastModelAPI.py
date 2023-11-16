@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, send_file
 import io
-from rivercastModel import forecast, sendCleanData, sendrawData
+from rivercastModel import forecast, cleanData, rawData,updateMainData
 import matplotlib
 matplotlib.use('Agg')  # Use a non-GUI backend
 import matplotlib.pyplot as plt
@@ -49,14 +49,14 @@ def predict():
 # Endpoint for raw data plot
 @app.route('/raw_data_plot', methods=['GET'])
 def raw_data_plot():
-    rd = sendrawData()
+    rd = rawData
     image_stream = save_plot(rd, 'raw_data_plot.png')
     return send_file(image_stream, mimetype='image/png')
 
 # Endpoint for clean data plot
 @app.route('/clean_data_plot', methods=['GET'])
 def clean_data_plot():
-    cd = sendCleanData()
+    cd = cleanData
     image_stream = save_plot(cd, 'clean_data_plot.png')
     return send_file(image_stream, mimetype='image/png')
 
@@ -86,23 +86,15 @@ def addTrueValues():
 
 @app.route('/updateModelData', methods=['GET'])
 def updateModelData():
-    d = datetime.today()
-    h = d.hour
-    m = d.minute
-    s = d.second
-    ms = d.microsecond
+    if updateMainData()[1] != "Data are up-to-date":
+            dftosql = updateMainData()[0]
+            engine = create_engine("mysql+pymysql://" + "admin" + ":" + "Nath1234" + "@" + "database-1.cccp1zhjxtzi.ap-southeast-1.rds.amazonaws.com" + "/" + "rivercast")
+            dftosql.to_sql(name = "modelData1", con=engine, index=False, if_exists="append")
 
-    datetoday = d - timedelta(hours=h, minutes=m, seconds=s, microseconds=ms)
+            return jsonify("Model Data updated!")
+    else:
+        return jsonify("Data are up-to-date")
 
-    startDate = datetoday
-    endDate = datetime.today()
-    weatherbit = f'https://api.weatherbit.io/v2.0/history/hourly?lat=14.679696901082357&lon=121.10970052493437&start_date={startDate}&end_date={endDate}&tz=local&key=2b382660ad4843188647514206bf330e'
-
-
-    
-
-
-    return jsonify(datetoday)
 
 
 

@@ -1,20 +1,16 @@
-date_time,humidity,precipitation,temperature
-2023-11-14:16,18.129888412775212,0.0,27.5
-2023-11-14:17,18.46448538213696,1.0,27.1
-2023-11-14:18,18.483101459553737,2.0,26.7
-2023-11-14:19,18.595961234628195,0.0,26.6
-2023-11-14:20,18.483101459553737,0.0,26.5
-2023-11-14:21,18.483101459553737,0.0,26.5
-2023-11-14:22,18.352348727818782,0.0,27.2
-2023-11-14:23,18.445906767008506,0.0,27.8
-2023-11-15:00,18.671777465023812,0.0,28.4
-2023-11-15:01,18.539881154020545,0.0,29.0
-2023-11-15:02,18.55853689386707,0.0,29.5
-2023-11-15:03,18.55853689386707,0.0,30.0
-2023-11-15:04,18.57723021617604,0.0,30.2
-2023-11-15:05,18.690586131715897,0.5,30.3
-2023-11-15:06,18.595961234628195,1.0,30.5
-2023-11-15:07,18.37085049952466,1.0,30.0
-2023-11-15:08,18.14816346627618,0.0,29.6
-2023-11-15:09,18.129888412775212,0.0,29.3
-2023-11-15:10,18.445906767008506,0.0,28.4
+station3,year3,month3,day3,hour3,waterlevel3,station1,year1,month1,day1,hour1,waterlevel1,station2,year2,month2,day2,hour2,waterlevel2
+Montalban,2023,November,16,0,21.56,Nangka,2023,November,16,0,15.93,Sto Nino,2023,November,16,0,11.66
+Montalban,2023,November,16,1,21.56,Nangka,2023,November,16,1,15.93,Sto Nino,2023,November,16,1,11.66
+Montalban,2023,November,16,2,21.56,Nangka,2023,November,16,2,15.93,Sto Nino,2023,November,16,2,11.66
+Montalban,2023,November,16,3,21.56,Nangka,2023,November,16,3,15.93,Sto Nino,2023,November,16,3,11.66
+Montalban,2023,November,16,4,21.56,Nangka,2023,November,16,4,15.93,Sto Nino,2023,November,16,4,11.66
+Montalban,2023,November,16,5,21.56,Nangka,2023,November,16,5,15.93,Sto Nino,2023,November,16,5,11.66
+Montalban,2023,November,16,6,21.56,Nangka,2023,November,16,6,15.93,Sto Nino,2023,November,16,6,11.66
+Montalban,2023,November,16,7,21.56,Nangka,2023,November,16,7,15.93,Sto Nino,2023,November,16,7,11.66
+Montalban,2023,November,16,8,21.56,Nangka,2023,November,16,8,15.93,Sto Nino,2023,November,16,8,11.66
+Montalban,2023,November,16,9,21.56,Nangka,2023,November,16,9,15.93,Sto Nino,2023,November,16,9,11.66
+Montalban,2023,November,16,10,21.56,Nangka,2023,November,16,10,15.93,Sto Nino,2023,November,16,10,11.66
+Montalban,2023,November,16,11,21.56,Nangka,2023,November,16,11,15.93,Sto Nino,2023,November,16,11,11.66
+Montalban,2023,November,16,12,21.56,Nangka,2023,November,16,12,15.93,Sto Nino,2023,November,16,12,11.66
+Montalban,2023,November,16,13,21.56,Nangka,2023,November,16,13,15.93,Sto Nino,2023,November,16,13,11.66
+Montalban,2023,November,16,14,21.56,Nangka,2023,November,16,14,15.93,Sto Nino,2023,November,16,14,11.66
