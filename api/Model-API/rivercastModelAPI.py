@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, send_file
 import io
-from rivercastModel import forecast, initiate_model, updateMainData
+from rivercastModel import forecast, initiate_model, updateMainData, getAttnScores
 import matplotlib
 matplotlib.use('Agg')  # Use a non-GUI backend
 import matplotlib.pyplot as plt
@@ -11,6 +11,7 @@ from datetime import date
 import pymysql
 import mysql.connector
 from sqlalchemy import create_engine, inspect
+from PIL import Image
 
 
 
@@ -61,6 +62,35 @@ def clean_data_plot():
     cd = initiate_model.cleanData
     image_stream = save_plot(cd, 'clean_data_plot.png')
     return send_file(image_stream, mimetype='image/png')
+
+
+@app.route('/attention_scores', methods=['GET'])
+def attention_scores():
+    initiate_model().__init__
+    attn_score_images = getAttnScores()
+
+    # Create a composite image containing all attention scores
+    composite_image = create_composite_image(attn_score_images)
+
+    # Save the composite image to a BytesIO object
+    composite_image_stream = io.BytesIO()
+    composite_image.savefig(composite_image_stream, format='png')
+    composite_image_stream.seek(0)
+
+    # Send the composite image as a response
+    return send_file(composite_image_stream, mimetype='image/png')
+
+def create_composite_image(images):
+    # Create a composite image horizontally stacking all attention score images
+    fig, axes = plt.subplots(1, len(images), figsize=(len(images) * 5, 5))
+
+    for ax, image in zip(axes, images):
+        # Display the image on the axis
+        ax.imshow(Image.open(image))
+        ax.axis('off')
+
+    return fig
+
 
 @app.route('/addPredictionToDB', methods=['GET'])
 def addPrediction():

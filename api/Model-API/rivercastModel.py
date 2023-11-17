@@ -10,7 +10,7 @@ import scipy as sc
 from sklearn.preprocessing import MinMaxScaler
 from skimage.measure import block_reduce
 from sklearn.metrics import mean_absolute_error
-
+import io
 import requests
 from metpy.calc import specific_humidity_from_dewpoint
 from metpy.units import units
@@ -686,3 +686,56 @@ def updateMainData():
     mydb.close()
 
     return merged_df, updatedData
+
+
+
+
+def getAttnScores():
+    test_data = initiate_model.reduced_df['2023-09-27':].values
+    test_dates = initiate_model.reduced_df['2023-09-27':].index
+    test_dates = test_dates[60:240]
+
+    x_test = test_data[:180]
+    y_label = test_data[60:180]
+    y_label = initiate_model.label_scaler.inverse_transform(y_label[:, :4])
+
+    x_test = np.reshape(x_test, (1, x_test.shape[0], x_test.shape[1]))
+
+    decomposer.eval()  # set model on test mode
+
+    x_test = torch.from_numpy(x_test).float().to(initiate_model.device)
+    attn_scores, y_test = decomposer(x_test)  # make forecast
+    y_test = y_test.detach().cpu().numpy()
+    y_test = np.reshape(y_test, (y_test.shape[1], y_test.shape[2]))
+    y_test = initiate_model.label_scaler.inverse_transform(y_test[:, :4])
+
+        # plot predictions
+    for i in [0, 1, 2, 3]:
+        plt.plot(np.convolve(y_test[:, i], np.ones(30), 'valid') / 30)
+        plt.plot(y_label[30:, i], color='k', alpha=0.3)
+        plt.show()
+
+    # plot attention scores
+    attn_scores = torch.squeeze(attn_scores, dim=0)
+    attn_scores = attn_scores.detach().cpu().numpy()  # transfer output from GPU to CPU
+    
+    
+    attention_score_images = []
+
+    for idx, attention in enumerate(attn_scores):
+        selected_attention = attention[10:]
+        selected_attention = block_reduce(selected_attention, (15, 15), np.max)
+
+        fig, ax = plt.subplots()
+        ax.matshow(selected_attention, cmap='viridis')
+
+        # Save the plot to a BytesIO object
+        image_stream = io.BytesIO()
+        plt.savefig(image_stream, format='png')
+        image_stream.seek(0)
+
+        # Append the image stream to the list
+        attention_score_images.append(image_stream)
+
+    # Return the list of attention score images
+    return attention_score_images
