@@ -26,184 +26,181 @@ password="Nath1234",
 database= "rivercast"
 )
 
+class initiate_model():
+    #IMPORTING
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')  # configure GPU    utilization
+    device
 
-#IMPORTING
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')  # configure GPU    utilization
-device
+    mydb._open_connection()
+    query = "SELECT * FROM rivercast.modelData;"
+    result_dataFrame = pd.read_sql(query, mydb)
 
+    print(result_dataFrame.tail(10))
 
-query = "SELECT * FROM rivercast.modelData1;"
-result_dataFrame = pd.read_sql(query, mydb)
+    # Specify the column to exclude (change 'column_to_exclude' to the actual column name)
+    column_to_exclude = 'Date_Time'
 
-# Specify the column to exclude (change 'column_to_exclude' to the actual column name)
-column_to_exclude = 'Datetime'
+    # Exclude the specified column
+    df = result_dataFrame.drop(column_to_exclude, axis=1, errors='ignore')
 
-# Exclude the specified column
-df = result_dataFrame.drop(column_to_exclude, axis=1, errors='ignore')
+    # Print the DataFrame without the excluded column
 
-# Print the DataFrame without the excluded column
-print(df.head())
+    # Now 'df' can be used as 'mainDataToDB' or for further processing
 
-# Now 'df' can be used as 'mainDataToDB' or for further processing
+    # convert month name to integer
 
-# convert month name to integer
-month_dict = dict((v, k) for k, v in enumerate(calendar.month_name))
-df['Month'] = df['Month'].map(month_dict)
+    # create datetime column
+    df[['Year', 'Month', 'Day', 'Hour']] = df[['Year', 'Month', 'Day', 'Hour']].astype(int)
+    df['Hour'] = df['Hour'].apply(lambda x: x if x < 24 else 0)
 
-# create datetime column
-df[['Year', 'Month', 'Day', 'Hour']] = df[['Year', 'Month', 'Day', 'Hour']].astype(int)
-df['Hour'] = df['Hour'].apply(lambda x: x if x < 24 else 0)
+    # convert year, month, day, and hour columns into timestamp
+    df['Datetime'] = df[['Year', 'Month', 'Day', 'Hour']].apply(lambda row: datetime(row['Year'], row['Month'], row['Day'], row['Hour']).isoformat(), axis=1)
+    df["Datetime"] = pd.to_datetime(df["Datetime"], format='ISO8601')
 
-# convert year, month, day, and hour columns into timestamp
-df['Datetime'] = df[['Year', 'Month', 'Day', 'Hour']].apply(lambda row: datetime(row['Year'], row['Month'], row['Day'], row['Hour']).isoformat(), axis=1)
-df["Datetime"] = pd.to_datetime(df["Datetime"], format='ISO8601')
+    # assign timestamps as the data frame index
+    df.index = df["Datetime"]
+    df = df.drop(['Datetime'], axis=1)
 
-# assign timestamps as the data frame index
-df.index = df["Datetime"]
-df = df.drop(['Datetime'], axis=1)
+    # select the parameters
+    df = df[['Waterlevel', 'Waterlevel.1', 'Waterlevel.2', 'Waterlevel.3', 'RF-Intensity', 'RF-Intensity.1', 'RF-Intensity.2', 'RF-Intensity.3', 'Precipitation', 'Precipitation.1', 'Precipitation.2', 'Humidity', 'Humidity.1', 'Humidity.2', 'Temperature', 'Temperature.1', 'Temperature.2']] 
+    df = df.astype(np.float64)  # convert parameters into a double precision floating number
 
-# select the parameters
-df = df[['Waterlevel', 'Waterlevel.1', 'Waterlevel.2', 'Waterlevel.3', 'RF-Intensity', 'RF-Intensity.1', 'RF-Intensity.2', 'RF-Intensity.3', 'Precipitation', 'Precipitation.1', 'Precipitation.2', 'Humidity', 'Humidity.1', 'Humidity.2', 'Temperature', 'Temperature.1', 'Temperature.2']] 
-df = df.astype(np.float64)  # convert parameters into a double precision floating number
-
-# fill in missing values using linear interpolation
-df = df.interpolate(method='linear', limit_direction='forward')
-df = df.resample('6H').max()  # resample dataset using the max value for each 24-hours
-df = df.rolling(120).mean().dropna()  # perform moving average smoothing
-
-df.head(10)  # display data frame
-
-rawData = df
-
-# scale data
-scaler = MinMaxScaler()
-scaler.fit(df)
-# train label scaler
-label_scaler = MinMaxScaler()
-label_scaler.fit(df[['Waterlevel', 'Waterlevel.1', 'Waterlevel.2', 'Waterlevel.3']])
-
-scaled_ds = scaler.transform(df)
-df = pd.DataFrame(scaled_ds, columns=df.columns, index=df.index)
-
-#PCA AND EUCLIDEAN KERNEL
-
-# center data
-rainfall_df = df[['RF-Intensity', 'RF-Intensity.1', 'RF-Intensity.2', 'RF-Intensity.3']]
+    # fill in missing values using linear interpolation
+    df = df.interpolate(method='linear', limit_direction='forward')
+    df = df.resample('6H').max()  # resample dataset using the max value for each 24-hours
+    df = df.rolling(120).mean().dropna()  # perform moving average smoothing
 
 
-# calculate pairwise squared Euclidean distances
-sq_dists = sc.spatial.distance.pdist(rainfall_df.values.T, 'sqeuclidean')
+    rawData = df
 
-# convert pairwise distances into a square matrix
-mat_sq_dists = sc.spatial.distance.squareform(sq_dists)
+    # scale data
+    scaler = MinMaxScaler()
+    scaler.fit(df)
+    # train label scaler
+    label_scaler = MinMaxScaler()
+    label_scaler.fit(df[['Waterlevel', 'Waterlevel.1', 'Waterlevel.2', 'Waterlevel.3']])
 
-# compute the symmetric kernel matrix.
-gamma = 1 / len(rainfall_df.columns)
-K = np.exp(-gamma * mat_sq_dists)
+    scaled_ds = scaler.transform(df)
+    df = pd.DataFrame(scaled_ds, columns=df.columns, index=df.index)
 
-# center the kernel matrix.
-N = K.shape[0]
-one_n = np.ones((N, N)) / N
-K = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
+    #PCA AND EUCLIDEAN KERNEL
 
-# calculate eigenvectors and eigenvalues
-eigenvalues, eigenvectors = np.linalg.eigh(K)
-
-# calculate components
-rainfall_df = np.matmul(rainfall_df, eigenvectors) 
-rainfall_df = rainfall_df.iloc[:, 1]
-
-# center data
-precipitation_df = df[['Precipitation', 'Precipitation.1', 'Precipitation.2']]
+    # center data
+    rainfall_df = df[['RF-Intensity', 'RF-Intensity.1', 'RF-Intensity.2', 'RF-Intensity.3']]
 
 
-# calculate pairwise squared Euclidean distances
-sq_dists = sc.spatial.distance.pdist(precipitation_df.values.T, 'sqeuclidean')
+    # calculate pairwise squared Euclidean distances
+    sq_dists = sc.spatial.distance.pdist(rainfall_df.values.T, 'sqeuclidean')
 
-# convert pairwise distances into a square matrix
-mat_sq_dists = sc.spatial.distance.squareform(sq_dists)
+    # convert pairwise distances into a square matrix
+    mat_sq_dists = sc.spatial.distance.squareform(sq_dists)
 
-# compute the symmetric kernel matrix.
-gamma = 1/len(precipitation_df.columns)
-K = np.exp(-gamma * mat_sq_dists)
+    # compute the symmetric kernel matrix.
+    gamma = 1 / len(rainfall_df.columns)
+    K = np.exp(-gamma * mat_sq_dists)
 
-# center the kernel matrix.
-N = K.shape[0]
-one_n = np.ones((N, N)) / N
-K = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
+    # center the kernel matrix.
+    N = K.shape[0]
+    one_n = np.ones((N, N)) / N
+    K = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
 
-# calculate eigenvectors and eigenvalues
-eigenvalues, eigenvectors = np.linalg.eigh(K)
+    # calculate eigenvectors and eigenvalues
+    eigenvalues, eigenvectors = np.linalg.eigh(K)
 
-# calculate components
-precipitation_df = np.matmul(precipitation_df, eigenvectors) 
-precipitation_df = precipitation_df.iloc[:, 1]
+    # calculate components
+    rainfall_df = np.matmul(rainfall_df, eigenvectors) 
+    rainfall_df = rainfall_df.iloc[:, 1]
 
-# center data
-humidity_df = df[['Humidity', 'Humidity.1', 'Humidity.2']]
+    # center data
+    precipitation_df = df[['Precipitation', 'Precipitation.1', 'Precipitation.2']]
+
+
+    # calculate pairwise squared Euclidean distances
+    sq_dists = sc.spatial.distance.pdist(precipitation_df.values.T, 'sqeuclidean')
+
+    # convert pairwise distances into a square matrix
+    mat_sq_dists = sc.spatial.distance.squareform(sq_dists)
+
+    # compute the symmetric kernel matrix.
+    gamma = 1/len(precipitation_df.columns)
+    K = np.exp(-gamma * mat_sq_dists)
+
+    # center the kernel matrix.
+    N = K.shape[0]
+    one_n = np.ones((N, N)) / N
+    K = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
+
+    # calculate eigenvectors and eigenvalues
+    eigenvalues, eigenvectors = np.linalg.eigh(K)
+
+    # calculate components
+    precipitation_df = np.matmul(precipitation_df, eigenvectors) 
+    precipitation_df = precipitation_df.iloc[:, 1]
+
+    # center data
+    humidity_df = df[['Humidity', 'Humidity.1', 'Humidity.2']]
 
 
 
-# calculate pairwise squared Euclidean distances
-sq_dists = sc.spatial.distance.pdist(humidity_df.values.T, 'sqeuclidean')
+    # calculate pairwise squared Euclidean distances
+    sq_dists = sc.spatial.distance.pdist(humidity_df.values.T, 'sqeuclidean')
 
-# convert pairwise distances into a square matrix
-mat_sq_dists = sc.spatial.distance.squareform(sq_dists)
+    # convert pairwise distances into a square matrix
+    mat_sq_dists = sc.spatial.distance.squareform(sq_dists)
 
-# compute the symmetric kernel matrix.
-gamma = 1/len(humidity_df.columns)
-K = np.exp(-gamma * mat_sq_dists)
+    # compute the symmetric kernel matrix.
+    gamma = 1/len(humidity_df.columns)
+    K = np.exp(-gamma * mat_sq_dists)
 
-# center the kernel matrix.
-N = K.shape[0]
-one_n = np.ones((N, N)) / N
-K = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
+    # center the kernel matrix.
+    N = K.shape[0]
+    one_n = np.ones((N, N)) / N
+    K = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
 
-# calculate eigenvectors and eigenvalues
-eigenvalues, eigenvectors = np.linalg.eigh(K)
+    # calculate eigenvectors and eigenvalues
+    eigenvalues, eigenvectors = np.linalg.eigh(K)
 
-# calculate components
-humidity_df = np.matmul(humidity_df, eigenvectors) 
-humidity_df = humidity_df.iloc[:, 1]
+    # calculate components
+    humidity_df = np.matmul(humidity_df, eigenvectors) 
+    humidity_df = humidity_df.iloc[:, 1]
 
-# center data
-temp_df = df[['Temperature', 'Temperature.1', 'Temperature.2']]
-
-
-
-# calculate pairwise squared Euclidean distances
-sq_dists = sc.spatial.distance.pdist(temp_df.values.T, 'sqeuclidean')
-
-# convert pairwise distances into a square matrix
-mat_sq_dists = sc.spatial.distance.squareform(sq_dists)
-
-# compute the symmetric kernel matrix.
-gamma = 1/len(temp_df.columns)
-K = np.exp(-gamma * mat_sq_dists)
-
-# center the kernel matrix.
-N = K.shape[0]
-one_n = np.ones((N, N)) / N
-K = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
-
-# calculate eigenvectors and eigenvalues
-eigenvalues, eigenvectors = np.linalg.eigh(K)
-
-# calculate components
-temp_df = np.matmul(temp_df, eigenvectors)
-temp_df = temp_df.iloc[:, 1]
-
-weather_df = pd.concat([rainfall_df, precipitation_df, humidity_df, temp_df], axis=1)
-weather_df.columns = ['Rainfall', 'Precipitation', 'Humidity', 'Temperature']
-
-river_df = df[['Waterlevel', 'Waterlevel.1', 'Waterlevel.2', 'Waterlevel.3']]
-reduced_df = pd.concat([river_df, weather_df], axis=1)
-
-print(reduced_df.head(10))
+    # center data
+    temp_df = df[['Temperature', 'Temperature.1', 'Temperature.2']]
 
 
-cleanData = reduced_df
 
+    # calculate pairwise squared Euclidean distances
+    sq_dists = sc.spatial.distance.pdist(temp_df.values.T, 'sqeuclidean')
+
+    # convert pairwise distances into a square matrix
+    mat_sq_dists = sc.spatial.distance.squareform(sq_dists)
+
+    # compute the symmetric kernel matrix.
+    gamma = 1/len(temp_df.columns)
+    K = np.exp(-gamma * mat_sq_dists)
+
+    # center the kernel matrix.
+    N = K.shape[0]
+    one_n = np.ones((N, N)) / N
+    K = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
+
+    # calculate eigenvectors and eigenvalues
+    eigenvalues, eigenvectors = np.linalg.eigh(K)
+
+    # calculate components
+    temp_df = np.matmul(temp_df, eigenvectors)
+    temp_df = temp_df.iloc[:, 1]
+
+    weather_df = pd.concat([rainfall_df, precipitation_df, humidity_df, temp_df], axis=1)
+    weather_df.columns = ['Rainfall', 'Precipitation', 'Humidity', 'Temperature']
+
+    river_df = df[['Waterlevel', 'Waterlevel.1', 'Waterlevel.2', 'Waterlevel.3']]
+    reduced_df = pd.concat([river_df, weather_df], axis=1)
+
+
+
+
+    cleanData = reduced_df
 
 
 class TimeSeriesDataset(torch.utils.data.Dataset):
@@ -333,7 +330,7 @@ class Transformer(nn.Module):
         return tgt_mask
 
     def forward(self, tgt):
-        mask = self.generate_mask(tgt).to(device)
+        mask = self.generate_mask(tgt).to(initiate_model.device)
         tgt_embedded = self.dropout(self.positional_encoding(tgt))
 
         dec_output = tgt_embedded
@@ -353,34 +350,42 @@ decomposer = Transformer(
     dropout=DROPOUT
 ).float()
 
-decomposer.to(device)
+decomposer.to(initiate_model.device)
 
 decomposer.load_state_dict(torch.load('transformer.pth'))
 
 decomposer.eval()  # set model on test mode
 
+mydb.close()
+
 def forecast():
-    test_data = reduced_df['2023-09-25':].values
-    test_dates = reduced_df['2023-09-25':].index
+    test_data = initiate_model.reduced_df[-180:].values
+    test_dates = initiate_model.reduced_df[-180:].index
     test_dates = test_dates[60:240]
 
     x_test = test_data[:180]
     y_label = test_data[60:]
-    y_label = label_scaler.inverse_transform(y_label[:, :4])
+    y_label = initiate_model.label_scaler.inverse_transform(y_label[:, :4])
 
     x_test = np.reshape(x_test, (1, x_test.shape[0], x_test.shape[1]))
 
     decomposer.eval()  # set model on test mode
 
-    x_test = torch.from_numpy(x_test).float().to(device)
+    x_test = torch.from_numpy(x_test).float().to(initiate_model.device)
     attn_scores, y_test = decomposer(x_test)  # make forecast
     y_test = y_test.detach().cpu().numpy()
     y_test = np.reshape(y_test, (y_test.shape[1], y_test.shape[2]))
-    y_test = label_scaler.inverse_transform(y_test[:, :4])
+    y_test = initiate_model.label_scaler.inverse_transform(y_test[:, :4])
 
 
     time_steps_per_day = 4  # Assuming 4 time steps per day (6 hours per time step)
     forecast_days = 15
+    
+    mydb._open_connection()
+    cursor = mydb.cursor()
+    cursor.execute("SELECT DateTime FROM rivercast.rivercast_waterlevel_prediction order by DateTime DESC LIMIT 1")
+    lastPredDT = cursor.fetchone()[0]
+    formatted_lastPredDT = lastPredDT.strftime('%Y-%m-%d %H:%M:%S')
 
     # Extract the forecast for the next 15 days
     forecast_values = y_test[:forecast_days * time_steps_per_day]
@@ -390,29 +395,55 @@ def forecast():
     forecast_df = pd.DataFrame(data=forecast_values, columns=['P.Waterlevel', 'P.Waterlevel-1', 'P.Waterlevel-2', 'P.Waterlevel-3'])
     forecast_df.insert(0, "DateTime", forecast_dates)
 
-    # Extract the forecast for the next 15 days
-    true_values = y_label[-1:]
+    matches_and_following_rows_pred = forecast_df[forecast_df['DateTime'] >= formatted_lastPredDT]
 
-    true_dates = pd.date_range(start= test_dates[-1] , end= test_dates[-1] )[:]
+
+
+    cursor.execute("SELECT DateTime FROM rivercast.rivercast_waterlevel_obs order by DateTime DESC LIMIT 1")
+    lastTrueDT = cursor.fetchone()[0] + timedelta(hours=6)
+
+    # Extract the forecast for the next 15 days
+    true_values = y_label[-120:]
+
+    true_dates = pd.date_range(test_dates[-120], periods=120, freq='6H')[:]
     true_df = pd.DataFrame(data=true_values ,columns=['T.Waterlevel', 'T.Waterlevel-1', 'T.Waterlevel-2', 'T.Waterlevel-3']) #converting numpy to dataframe
     true_df.insert(0, "DateTime", true_dates) #adding DateTime column
 
+    puirpose = pd.DataFrame(data=y_label ,columns=['T.Waterlevel', 'T.Waterlevel-1', 'T.Waterlevel-2', 'T.Waterlevel-3'])
 
-    return forecast_df, true_df
+    formatted_lastTrueDT = lastTrueDT.strftime('%Y-%m-%d %H:%M:%S')
+
+    mydb.close()
+
+    matches_and_following_rows = true_df[true_df['DateTime'] >= formatted_lastTrueDT]
+
+    return matches_and_following_rows_pred[1:2], matches_and_following_rows
+
+
+
+
+def getLatest_Datetime():
+    mydb._open_connection()
+    cursor = mydb.cursor()
+
+    cursor.execute("SELECT Date_Time FROM rivercast.modelData order by Date_Time DESC LIMIT 1")
+    lastDTindex = cursor.fetchone()
+    print(lastDTindex)
+
+
+    return lastDTindex
+
 
 
 def updateMainData():
 
-    cursor = mydb.cursor()
+    getLatest_Datetime()
+    lastDTindexDef = getLatest_Datetime()
 
-    cursor.execute("SELECT Datetime FROM rivercast.modelData1 order by Datetime DESC LIMIT 1")
-    lastDTindex = cursor.fetchone()
-
-    ldi = str(lastDTindex).replace("(datetime.datetime(", "").replace("),)", "").replace(", ", "-")
+    ldi = str(lastDTindexDef).replace("(datetime.datetime(", "").replace("),)", "").replace(", ", "-")
 
     lastDT = datetime.strptime(ldi, '%Y-%m-%d-%H-%M')
 
-    cursor = mydb.cursor()
 
     # Common date calculations
     d = lastDT
@@ -440,7 +471,7 @@ def updateMainData():
     weatherbit = f'https://api.weatherbit.io/v2.0/history/hourly?lat=14.679696901082357&lon=121.10970052493437&start_date={startDate}&end_date={endDate}&tz=local&key=2b382660ad4843188647514206bf330e'
     wbRes = requests.get(weatherbit)
     wbReq = wbRes.json()
-
+    print(startDate, endDate)
     try:
         wbReq = wbRes.json()
         wbitArr = []
@@ -455,9 +486,8 @@ def updateMainData():
             
             strHumi = str(humi)
             humidity = strHumi.replace(" gram / kilogram", "")
-            
+
             wbitArr.append({
-                "date_time": time_date,
                 "humidity": humidity,
                 "precipitation": preci,
                 "temperature": temperature
@@ -473,7 +503,7 @@ def updateMainData():
         weather_df['humidity2'] = weather_df['humidity'].copy()
         weather_df['precipitation2'] = weather_df['precipitation'].copy()
 
-        weather_df = weather_df.reindex(columns=['humidity', 'precipitation', 'temperature', 'temperature1', 'humidity1', 'precipitation1', 'temperature2', 'humidity2', 'precipitation2', 'date_time'])
+        weather_df = weather_df.reindex(columns=['humidity', 'precipitation', 'temperature', 'temperature1', 'humidity1', 'precipitation1', 'temperature2', 'humidity2', 'precipitation2'])
 
     except KeyError:
         print("Data are up-to-date")
@@ -501,12 +531,13 @@ def updateMainData():
                 data = response.json()
 
                 entry_data = {}
-
+                
                 for entry in data:
                     for i, obsnm in enumerate(obsnm_list, start=1):
+                        
                         if obsnm in entry['obsnm']:
                             year = int(formatted_date[:4])
-                            month = datetime.strptime(formatted_date[4:6], '%m').strftime('%B')
+                            month = int(formatted_date[4:6])
                             day = int(formatted_date[6:8])
                             hour = int(formatted_date[8:10])
                             waterlevel = entry.get('wl', 'null')
@@ -515,6 +546,7 @@ def updateMainData():
                             waterlevel = waterlevel.replace("(*)", "")
 
                             entry_data.update({
+                                "date_time": pd.to_datetime(f"{year}-{month:02d}-{day:02d} {hour:02d}:00:00"),  # Create Date_Time column
                                 f"station{i}": entry['obsnm'],
                                 f"year{i}": year,
                                 f"month{i}": month,
@@ -522,7 +554,6 @@ def updateMainData():
                                 f"hour{i}": hour,
                                 f"waterlevel{i}": waterlevel
                             })
-
                 wlArr.append(entry_data)
 
             except Exception as e:
@@ -540,7 +571,7 @@ def updateMainData():
     else:
         print("Data are up-to-date")
 
-    waterlevel_df = waterlevel_df.reindex(columns=['station1', 'year1', 'month1', 'day1', 'hour1','waterlevel1', 'station2', 'year2', 'month2', 'day2', 'hour2','waterlevel2', 'waterlevel2dup', 'station3', 'year3', 'month3', 'day3', 'hour3','waterlevel3'])
+    waterlevel_df = waterlevel_df.reindex(columns=['station1', 'year1', 'month1', 'day1', 'hour1','waterlevel1', 'station2', 'year2', 'month2', 'day2', 'hour2','waterlevel2', 'waterlevel2dup', 'station3', 'year3', 'month3', 'day3', 'hour3','waterlevel3','date_time'])
 
     waterlevel_df = waterlevel_df.rename(columns={"station1": "station_1","station2": "station_2"})
 
@@ -574,7 +605,8 @@ def updateMainData():
 
                             entry_data.update({
                                 f"station{i}": entry['obsnm'],
-                                f"rainfall{i}": rainfall
+                                f"rainfall{i}": rainfall,
+                                "date_time": current_date  # Use current_date instead of start_date
                             })
 
                 wlArr.append(entry_data)
@@ -604,7 +636,8 @@ def updateMainData():
 
 
     # Consolidate all data into one DataFrame
-    merged_df = pd.concat([waterlevel_df, rainfall_df, weather_df ], axis=1).dropna()
+    merged_df = pd.concat([waterlevel_df, rainfall_df, weather_df], axis=1).dropna()
+
 
     # Assuming your DataFrame is called merged_df
     new_columns = {
@@ -642,12 +675,14 @@ def updateMainData():
         'temperature2': 'Temperature.2',
         'humidity2': 'Humidity.2',
         'precipitation2': 'Precipitation.2',
-        'date_time': 'Datetime'
+        'date_time': 'Date_Time'
     }
 
     merged_df.rename(columns=new_columns, inplace=True)
 
+
     # Save to CSV
     merged_df.to_csv('consolidated_data.csv', index=False)
+    mydb.close()
 
     return merged_df, updatedData

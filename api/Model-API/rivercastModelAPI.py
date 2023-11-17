@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, send_file
 import io
-from rivercastModel import forecast, cleanData, rawData,updateMainData
+from rivercastModel import forecast, initiate_model, updateMainData
 import matplotlib
 matplotlib.use('Agg')  # Use a non-GUI backend
 import matplotlib.pyplot as plt
@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from datetime import date
 import pymysql
 import mysql.connector
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 
 
 
@@ -49,49 +49,76 @@ def predict():
 # Endpoint for raw data plot
 @app.route('/raw_data_plot', methods=['GET'])
 def raw_data_plot():
-    rd = rawData
+    initiate_model().__init__
+    rd = initiate_model.rawData
     image_stream = save_plot(rd, 'raw_data_plot.png')
     return send_file(image_stream, mimetype='image/png')
 
 # Endpoint for clean data plot
 @app.route('/clean_data_plot', methods=['GET'])
 def clean_data_plot():
-    cd = cleanData
+    initiate_model().__init__
+    cd = initiate_model.cleanData
     image_stream = save_plot(cd, 'clean_data_plot.png')
     return send_file(image_stream, mimetype='image/png')
 
-# Endpoint for clean data plot
 @app.route('/addPredictionToDB', methods=['GET'])
 def addPrediction():
-
+    # Call forecast function
+    initiate_model().__init__
     df1 = forecast()[0]
 
-    df1.to_sql(name='rivercast_waterlevel_prediction', con=engine, index = False, if_exists='append')
+    # Check if the DataFrame is empty
+    if df1.empty:
+        return jsonify("No prediction data to add to DB")
 
-    df2 = forecast()[1]
+    # Assuming 'date_time' is the column name in your DataFrame
+    df1.set_index('DateTime', inplace=True)
 
-    df2.to_sql(name='rivercast_waterlevel_obs', con=engine, index = False, if_exists='append')
+    # Use 'DateTime' as the index label in the database
+    df1.to_sql(name='rivercast_waterlevel_prediction', con=engine, index=True, index_label='DateTime', if_exists='append', method='multi')
 
     return jsonify("Add Prediction Values to DB initiated")
     
 @app.route('/addTrueValuesToDB', methods=['GET'])
 def addTrueValues():
-
+    initiate_model().__init__
+    # Call forecast function
     df2 = forecast()[1]
 
-    df2.to_sql(name='rivercast_waterlevel_obs', con=engine, index = False, if_exists='append')
+    # Check if the DataFrame is empty
+    if df2.empty:
+        return jsonify("No true values data to add to DB")
+
+    # Assuming 'date_time' is the column name in your DataFrame
+    df2.set_index('DateTime', inplace=True)
+
+    # Use 'DateTime' as the index label in the database
+    df2.to_sql(name='rivercast_waterlevel_obs', con=engine, index=True, index_label='DateTime', if_exists='append', method='multi')
 
     return jsonify("Add True Values to DB initiated")
 
 
 @app.route('/updateModelData', methods=['GET'])
 def updateModelData():
-    if updateMainData()[1] != "Data are up-to-date":
-            dftosql = updateMainData()[0]
-            engine = create_engine("mysql+pymysql://" + "admin" + ":" + "Nath1234" + "@" + "database-1.cccp1zhjxtzi.ap-southeast-1.rds.amazonaws.com" + "/" + "rivercast")
-            dftosql.to_sql(name = "modelData1", con=engine, index=False, if_exists="append")
+    update_result = updateMainData()
 
-            return jsonify("Model Data updated!")
+    if update_result[1] != "Data are up-to-date":
+        dftosql = update_result[0]
+        engine = create_engine("mysql+pymysql://" + "admin" + ":" + "Nath1234" + "@" + "database-1.cccp1zhjxtzi.ap-southeast-1.rds.amazonaws.com" + "/" + "rivercast")
+
+        # Create an inspector and check if the table 'modelData' already exists in the database
+        inspector = inspect(engine)
+        table_exists = inspector.has_table("modelData")
+
+        # If the table exists, append data without duplicates
+        if table_exists:
+            dftosql.to_sql(name="modelData", con=engine, index=False, if_exists="append", index_label=False, method="multi", chunksize=1000)
+        else:
+            # If the table doesn't exist, create it and insert the data
+            dftosql.to_sql(name="modelData", con=engine, index=False, if_exists="replace", index_label=False)
+
+        return jsonify("Model Data updated!")
     else:
         return jsonify("Data are up-to-date")
 
