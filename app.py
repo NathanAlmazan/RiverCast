@@ -29,7 +29,8 @@ def pipeline_updates():
     weather.update()
     rainfall.update()
     # update log
-    print(f"Pipelines updated at {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}.")
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"Pipelines updated at {timestamp}.")
 
 
 if __name__ == '__main__':
