@@ -38,7 +38,7 @@ class Weather(DbConnection):
 
                 values.append((
                     response['name'],                                                           # station
-                    datetime.fromtimestamp(response['dt']).strftime("%Y-%m-%d %H:%M:%S+08"),    # recorded_at
+                    datetime.fromtimestamp(response['dt']).strftime("%Y-%m-%d %H:%M:%S+00"),    # recorded_at
                     response['rain']['1h'] if 'rain' in response else None,                     # rainfall
                     response['wind']['speed'] if 'wind' in response else None,                  # wind speed
                     response['main']['temp'],                                                   # temperature
