@@ -18,7 +18,7 @@ def home_page():  # put application's code here
     return 'RiverCast!'
 
 
-@scheduler.task('interval', id='pipeline_updates', seconds=30, misfire_grace_time=900)
+@scheduler.task('interval', id='pipeline_updates', seconds=1800, misfire_grace_time=900)
 def pipeline_updates():
     # initialize pipelines
     river = RiverLevel()
