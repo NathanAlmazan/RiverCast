@@ -43,7 +43,7 @@ def forecast_data():  # put application's code here
     return jsonify(results), 200
 
 
-@scheduler.task('interval', id='pipeline_updates', seconds=10, misfire_grace_time=900)
+@scheduler.task('interval', id='pipeline_updates', seconds=1800, misfire_grace_time=900)
 def pipeline_updates():
     # update pipelines
     update_weather()
