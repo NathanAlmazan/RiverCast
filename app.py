@@ -24,7 +24,12 @@ def current_data():  # put application's code here
     """
     results = fetch_many(query)
 
-    return jsonify(results), 200
+    return jsonify([{
+        'id': data[0],
+        'station': data[1],
+        'level': data[2],
+        'timestamp': data[3]
+    } for data in results]), 200
 
 
 @app.route('/forecast')
@@ -40,7 +45,10 @@ def forecast_data():  # put application's code here
         """
     results = fetch_many(query)
 
-    return jsonify(results), 200
+    return jsonify([{
+        'timestamp': data[0],
+        'level': data[1]
+    } for data in results]), 200
 
 
 @scheduler.task('interval', id='pipeline_updates', seconds=1800, misfire_grace_time=900)
