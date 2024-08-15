@@ -1,7 +1,7 @@
 from flask import Flask
 from datetime import datetime
 from flask_apscheduler import APScheduler
-from pipelines import Weather, Rainfall, RiverLevel
+from pipelines import update_weather, update_rainfall, update_river_level
 
 # initialize application
 app = Flask(__name__)
@@ -20,14 +20,10 @@ def home_page():  # put application's code here
 
 @scheduler.task('interval', id='pipeline_updates', seconds=1800, misfire_grace_time=900)
 def pipeline_updates():
-    # initialize pipelines
-    river = RiverLevel()
-    weather = Weather()
-    rainfall = Rainfall()
     # update pipelines
-    river.update()
-    weather.update()
-    rainfall.update()
+    update_weather()
+    update_rainfall()
+    update_river_level()
     # update log
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"Pipelines updated at {timestamp}.")
